@@ -1,0 +1,200 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Lattafa · Followers</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Big+Shoulders+Display:wght@900&family=Jost:wght@300;400;500&display=swap" rel="stylesheet">
+<style>
+:root{--bg:#f6f6f4;--ink:#161616;--muted:#8c8a85;--line:#e2e0db;--gold:#b08a45;--up:#3f8f5f;--down:#b44a3a}
+@media (prefers-color-scheme: dark){:root{--bg:#121212;--ink:#f1efea;--muted:#8f8c86;--line:#2a2927;--gold:#d4b066;--up:#7cc79a;--down:#e08a7c}}
+*{box-sizing:border-box;margin:0}
+html,body{height:100%}
+body{background:var(--bg);color:var(--ink);font-family:Jost,"Helvetica Neue",Arial,sans-serif;display:grid;place-items:center;overflow:hidden}
+main{width:min(92vw,1400px);display:flex;flex-direction:column;align-items:center;gap:4vh}
+.logo{width:clamp(96px,14vmin,180px);height:clamp(96px,14vmin,180px);border-radius:50%;object-fit:cover}
+.count{font-family:"Big Shoulders Display",Impact,sans-serif;font-weight:900;font-size:clamp(5rem,20vw,19rem);line-height:1;letter-spacing:0;display:flex;font-variant-numeric:tabular-nums}
+.d{height:1em;overflow:hidden;display:inline-block}
+.strip{display:flex;flex-direction:column;transition:transform 1.4s cubic-bezier(.2,.8,.2,1)}
+.strip span,.sep{height:1em;display:block}
+.sep{color:var(--gold);width:.28em}
+.label{font-size:clamp(1rem,1.6vw,1.35rem);color:var(--muted);letter-spacing:.04em;margin-top:-2vh}
+/* Instagram elements: story ring, handle, live hearts */
+.ring{padding:5px;border-radius:50%;background:conic-gradient(from 210deg,#feda75,#fa7e1e,#d62976,#962fbf,#4f5bd5,#feda75)}
+.ring .logo{display:block;border:4px solid var(--bg);background:#141414;object-fit:contain;padding:16%}
+.handle{display:flex;align-items:center;gap:.45em;font-size:clamp(1.05rem,1.9vw,1.5rem);font-weight:500;margin-top:-2vh}
+.handle img{width:1.05em;height:1.05em}
+#hearts{position:fixed;right:6vw;bottom:9vh;width:80px;height:60vh;pointer-events:none}
+.heart{position:absolute;bottom:0;left:50%;width:30px;height:30px;animation:rise 3.2s ease-out forwards}
+@keyframes rise{0%{transform:translate(-50%,0) scale(.4);opacity:0}15%{opacity:1}100%{transform:translate(calc(-50% + var(--dx)),-55vh) scale(1.05);opacity:0}}
+.goal{width:min(70vw,720px);display:flex;flex-direction:column;gap:.7em}
+.bar{height:12px;background:var(--line);border-radius:6px;overflow:hidden}
+.fill{height:100%;width:0;background:linear-gradient(90deg,#feda75,#fa7e1e,#d62976,#962fbf,#4f5bd5);transition:width 1.4s cubic-bezier(.2,.8,.2,1)}
+.goal-row{display:flex;justify-content:space-between;font-size:clamp(.85rem,1.2vw,1.05rem);color:var(--muted)}
+.goal-row b{color:var(--ink);font-weight:500}
+footer{position:fixed;bottom:3vh;left:0;right:0;display:flex;justify-content:center;gap:2.5em;font-size:.95rem;color:var(--muted)}
+.delta.up{color:var(--up)} .delta.down{color:var(--down)}
+.err{color:var(--down)}
+/* milestone overlay */
+#cel{position:fixed;inset:0;background:var(--bg);display:grid;place-items:center;opacity:0;pointer-events:none;transition:opacity .8s}
+#cel.on{opacity:1}
+#cel canvas{position:absolute;inset:0;width:100%;height:100%}
+.cel-in{position:relative;text-align:center;display:flex;flex-direction:column;align-items:center;gap:3vh}
+.cel-num{font-family:"Big Shoulders Display",Impact,sans-serif;font-weight:900;font-size:clamp(6rem,24vw,22rem);line-height:.9;letter-spacing:-.03em;background:linear-gradient(90deg,#feda75,#fa7e1e,#d62976,#962fbf,#4f5bd5);-webkit-background-clip:text;background-clip:text;color:transparent}
+.cel-txt{font-size:clamp(1.2rem,2.4vw,2rem);color:var(--ink)}
+@media (prefers-reduced-motion: reduce){.strip,.fill,#cel{transition:none}}
+</style>
+</head>
+<body>
+<main>
+  <div class="ring"><img class="logo" id="logo" alt="Lattafa" src="/logo.svg"></div>
+  <div class="handle"><img src="/ig-glyph.svg" alt="" onerror="this.remove()"><span id="handle">@lattafa_perfumes</span></div>
+  <div class="count" id="count" aria-live="polite"></div>
+  <div class="label">followers on Instagram</div>
+  <div class="goal">
+    <div class="bar"><div class="fill" id="fill"></div></div>
+    <div class="goal-row"><span id="togo"></span><span>Next milestone <b id="next"></b></span></div>
+  </div>
+</main>
+<div id="hearts" aria-hidden="true"></div>
+<footer><span class="delta" id="delta"></span><span id="ts"></span><span class="err" id="err" hidden></span></footer>
+
+<div id="cel" aria-live="assertive">
+  <canvas id="fx"></canvas>
+  <div class="cel-in">
+    <div class="ring"><img class="logo" id="cel-logo" alt=""></div>
+    <div class="cel-num" id="cel-num"></div>
+    <div class="cel-txt">followers on Instagram. Thank you.</div>
+  </div>
+</div>
+
+<script>
+// Demo mode: open with ?demo or #demo. Simulates growth across a milestone; never calls the API.
+const DEMO = /[?&]demo\b/.test(location.search) || location.hash === '#demo';
+const POLL_MS = DEMO ? 2000 : 30000, CEL_MS = 12000;
+const $ = id => document.getElementById(id);
+const fmt = n => n.toLocaleString('en-US');
+const compact = n => new Intl.NumberFormat('en-US',{notation:'compact',maximumFractionDigits:2}).format(n);
+const mem = {};
+const store = DEMO
+  ? { get:k=>mem[k]??null, set:(k,v)=>{mem[k]=v} }   // demo never touches real baselines
+  : { get:k=>{try{return localStorage.getItem(k)}catch{return null}}, set:(k,v)=>{try{localStorage.setItem(k,v)}catch{}} };
+const DEMO_LOGO = '/logo.svg';
+let demoN = 4996420;
+let shown = '', avatar = '';
+
+// Logo: /logo.svg if present in /public, else the IG profile picture.
+$('logo').onerror = () => { $('logo').onerror = null; if (avatar) $('logo').src = avatar; else $('logo').style.visibility='hidden'; };
+
+// Milestone step scales with size: 5.2M -> every 100K, 840K -> every 10K.
+const stepFor = n => Math.pow(10, Math.max(3, Math.floor(Math.log10(Math.max(n,1))) - 1));
+
+function render(n){
+  const s = fmt(n), box = $('count');
+  if (s.length !== shown.length){
+    box.innerHTML = '';
+    for (const ch of s){
+      if (/\d/.test(ch)){
+        const d = document.createElement('span'); d.className='d';
+        d.innerHTML = '<span class="strip">' + [...'0123456789'].map(x=>`<span>${x}</span>`).join('') + '</span>';
+        box.append(d);
+      } else { const c=document.createElement('span'); c.className='sep'; c.textContent=ch; box.append(c); }
+    }
+    void box.offsetWidth;
+  }
+  const strips = box.querySelectorAll('.strip');
+  [...s.replace(/\D/g,'')].forEach((dg,i)=>{ strips[i].style.transform = `translateY(-${dg*10}%)`; });
+  shown = s;
+}
+
+function goal(n){
+  const step = stepFor(n), prev = Math.floor(n/step)*step, next = prev + step;
+  $('fill').style.width = ((n-prev)/step*100).toFixed(2) + '%';
+  $('next').textContent = compact(next);
+  $('togo').textContent = fmt(next-n) + ' to go';
+  // Celebrate once per milestone crossed (stored so reloads don't re-trigger).
+  const last = +store.get('milestone') || 0;
+  if (!last) store.set('milestone', prev);
+  else if (prev > last){ store.set('milestone', prev); celebrate(prev); }
+}
+
+function delta(n){
+  const key = 'base-' + new Date().toISOString().slice(0,10);
+  let base = +store.get(key); if (!base){ store.set(key,n); base = n; }
+  const d = n - base, el = $('delta');
+  el.textContent = (d>=0?'+':'') + fmt(d) + ' today';
+  el.className = 'delta ' + (d>0?'up':d<0?'down':'');
+}
+
+function celebrate(m){
+  $('cel-num').textContent = compact(m);
+  $('cel-logo').src = $('logo').src;
+  $('cel').classList.add('on');
+  if (!matchMedia('(prefers-reduced-motion: reduce)').matches) burst();
+  setTimeout(()=>$('cel').classList.remove('on'), CEL_MS);
+}
+
+function burst(){
+  const c = $('fx'), x = c.getContext('2d'), dpr = devicePixelRatio||1;
+  c.width = innerWidth*dpr; c.height = innerHeight*dpr; x.scale(dpr,dpr);
+  const gold = getComputedStyle(document.documentElement).getPropertyValue('--gold').trim();
+  const P = Array.from({length:140},()=>({x:innerWidth/2,y:innerHeight/2,a:Math.random()*Math.PI*2,v:2+Math.random()*7,r:1+Math.random()*2.5,l:1}));
+  const t0 = performance.now();
+  (function f(t){
+    x.clearRect(0,0,innerWidth,innerHeight);
+    P.forEach(p=>{ p.x+=Math.cos(p.a)*p.v; p.y+=Math.sin(p.a)*p.v+0.6; p.v*=.985; p.l-=.006;
+      x.globalAlpha=Math.max(p.l,0); x.fillStyle=gold; x.beginPath(); x.arc(p.x,p.y,p.r,0,7); x.fill(); });
+    if (t-t0 < 4500) requestAnimationFrame(f); else x.clearRect(0,0,innerWidth,innerHeight);
+  })(t0);
+}
+
+// Live-style hearts when new followers arrive.
+let lastN = 0;
+function hearts(n){
+  if (lastN && n > lastN && !matchMedia('(prefers-reduced-motion: reduce)').matches){
+    const k = Math.min(6, Math.max(1, Math.ceil((n-lastN)/40)));
+    for (let i=0;i<k;i++) setTimeout(spawnHeart, i*220);
+  }
+  lastN = n;
+}
+function spawnHeart(){
+  const c = ['#fa7e1e','#d62976','#962fbf','#feda75'][Math.random()*4|0];
+  const h = document.createElementNS('http://www.w3.org/2000/svg','svg');
+  h.setAttribute('viewBox','0 0 24 24'); h.setAttribute('class','heart');
+  h.innerHTML = `<path fill="${c}" d="M12 21s-7.5-4.6-9.6-9.1C.9 8.6 3 5 6.5 5c2 0 3.6 1.1 4.5 2.6C11.9 6.1 13.5 5 15.5 5 19 5 21.1 8.6 19.6 11.9 17.5 16.4 12 21 12 21z"/>`;
+  h.style.setProperty('--dx', (Math.random()*70-35)+'px');
+  $('hearts').append(h); setTimeout(()=>h.remove(), 3300);
+}
+
+async function tick(){
+  if (DEMO){
+    demoN += 40 + Math.floor(Math.random()*180);
+    avatar = DEMO_LOGO;
+    if (!$('logo').src.startsWith('data:')){ $('logo').onerror = null; $('logo').src = DEMO_LOGO; $('logo').style.visibility=''; }
+    render(demoN); goal(demoN); delta(demoN); hearts(demoN);
+    $('ts').textContent = 'Demo data';
+    return;
+  }
+  try{
+    const r = await fetch('/api/count',{cache:'no-store'});
+    const j = await r.json();
+    if (!r.ok) throw new Error(j.error || r.status);
+    avatar = j.avatar || '';
+    if ($('logo').style.visibility==='hidden' && avatar){ $('logo').src = avatar; $('logo').style.visibility=''; }
+    if (j.username) $('handle').textContent = '@' + j.username;
+    render(j.followers); goal(j.followers); delta(j.followers); hearts(j.followers);
+    $('ts').textContent = 'Updated ' + new Date(j.ts).toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'});
+    $('err').hidden = true;
+  }catch(e){ $('err').textContent = 'Can’t reach Instagram. Retrying.'; $('err').hidden = false; }
+}
+
+// Keys: F = fullscreen, M = preview milestone screen.
+addEventListener('keydown', e => {
+  if (e.key==='f') document.fullscreenElement ? document.exitFullscreen() : document.documentElement.requestFullscreen?.();
+  if (e.key==='m' && shown){ const n=+shown.replace(/\D/g,''); celebrate(Math.floor(n/stepFor(n))*stepFor(n)); }
+});
+tick(); setInterval(tick, POLL_MS);
+</script>
+</body>
+</html>

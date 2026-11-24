@@ -3,7 +3,7 @@ import { getToken } from './_token.js';
 export default async function handler(req, res) {
   try {
     const t = await getToken();
-    const r = await fetch(`https://graph.instagram.com/me?fields=username,followers_count,profile_picture_url&access_token=${t}`);
+    const r = await fetch(`https://graph.facebook.com/v26.0/${process.env.IG_USER_ID}?fields=username,followers_count,profile_picture_url&access_token=${t}`);
     const j = await r.json();
     if (j.error) return res.status(502).json({ error: j.error.message });
     // Edge cache: all screens share one upstream call per 20s.
